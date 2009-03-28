@@ -54,11 +54,6 @@ namespace hqNx
 				e.GraphicsDeviceInformation.PresentationParameters.EnableAutoDepthStencil = false;
 			};
 
-#if !XBOX
-			graphics.PreferredBackBufferWidth = 1600;
-			graphics.PreferredBackBufferHeight = 1100;
-#endif
-
 			graphics.SynchronizeWithVerticalRetrace = false;
 			IsFixedTimeStep = false;
 
@@ -197,7 +192,8 @@ namespace hqNx
 			if( inState.Buttons.Back == ButtonState.Pressed )
 				this.Exit();
 
-			xOfs -= (int)(inState.ThumbSticks.Left.X * gameTime.ElapsedGameTime.TotalMilliseconds * 3);
+			offset += inState.ThumbSticks.Right * new Vector2( -3, 3 ) * (float)gameTime.ElapsedGameTime.TotalMilliseconds;
+			rotation += inState.ThumbSticks.Left.X * 0.003F * (float)gameTime.ElapsedGameTime.TotalMilliseconds;
 
 			if( inState.Buttons.X == ButtonState.Pressed &&
 				lastState.Buttons.X != ButtonState.Pressed )
@@ -205,7 +201,8 @@ namespace hqNx
 				testImageIndex = (testImageIndex + 1) % testImages.Length;
 				testImage = testImages[testImageIndex];
 
-				xOfs = 0;
+				offset = Vector2.Zero;
+				rotation = 0;
 			}
 
 			lastState = inState;
@@ -215,7 +212,8 @@ namespace hqNx
 			base.Update( gameTime );
 		}
 
-		private int xOfs = 0;
+		private float rotation = 0;
+		private Vector2 offset = Vector2.Zero;
 
 		/// <summary>
 		/// This is called when the game should draw itself.
@@ -232,26 +230,23 @@ namespace hqNx
 
 			int Pad = 10;
 			int yMin = 40;
-			int x = Pad + xOfs;
-			int y = yMin;
+			Vector2 org = offset + new Vector2( Pad, yMin );
+
+			Vector2 size = new Vector2( testImage.Width, testImage.Height );
 
 			spriteBatch.Begin();
-			spriteBatch.Draw( testImage, new Vector2( x, y ), Color.White );
-			x += testImage.Width + Pad;
-			yMin = Math.Max( yMin, y + testImage.Height + Pad );
+			spriteBatch.Draw( testImage, org, null, Color.White, rotation, size / 2.0F, 1, SpriteEffects.None, 0 );
+			org.X += size.X * 1.5F + Pad;
 			spriteBatch.End();
 
-			hqNx.Draw2x( new Point( x, y ) );
-			x += testImage.Width * 2 + Pad;
-			yMin = Math.Max( yMin, y + testImage.Height * 2 + Pad );
+			hqNx.Draw2x( org, rotation, size * 2.0F / 2.0F );
+			org.X += testImage.Width * 2.5F + Pad;
 
-			hqNx.Draw3x( new Point( x, y ) );
-			x += testImage.Width * 3 + Pad;
-			yMin = Math.Max( yMin, y + testImage.Height * 3 + Pad );
+			hqNx.Draw3x( org, rotation, size * 3.0F / 2.0F );
+			org.X += size.X * 3.5F + Pad;
 
-			hqNx.Draw4x( new Point( x, y ) );
-			x += testImage.Width * 4 + Pad;
-			yMin = Math.Max( yMin, y + testImage.Height * 4 + Pad );
+			hqNx.Draw4x( org, rotation, size * 4.0F / 2.0F );
+			org.X += size.X * 4.5F + Pad;
 
 			DrawFrameStats( gameTime );
 

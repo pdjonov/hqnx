@@ -67,17 +67,44 @@ namespace hqNx
 
 		private ScreenQuadVert[] screenFill = new ScreenQuadVert[4];
 
-		private void GenScreenQuad( Rectangle rc )
+		private void GenScreenQuad( Vector2 origin, int width, int height )
+		{
+			screenFill[0] = new ScreenQuadVert( origin.X, origin.Y, 0, 0 );
+			screenFill[1] = new ScreenQuadVert( origin.X + width, origin.Y, 1, 0 );
+			screenFill[2] = new ScreenQuadVert( origin.X, origin.Y + height, 0, 1 );
+			screenFill[3] = new ScreenQuadVert( origin.X + width, origin.Y + height, 1, 1 );
+		}
+
+		private void RotateScreenQuad( Vector2 origin, float angle )
+		{
+			float sin = (float)Math.Sin( angle );
+			float cos = (float)Math.Cos( angle );
+
+			for( int i = 0; i < 4; i++ )
+			{
+				float x = screenFill[i].x - origin.X;
+				float y = screenFill[i].y - origin.Y;
+
+				screenFill[i].x = origin.X + x * cos - y * sin;
+				screenFill[i].y = origin.Y + x * sin + y * cos;
+			}
+		}
+
+		private void ShiftScreenQuad( Vector2 delta )
+		{
+			for( int i = 0; i < 4; i++ )
+			{
+				screenFill[i].x += delta.X;
+				screenFill[i].y += delta.Y;
+			}
+		}
+
+		private void NormalizeQuadCoords()
 		{
 			Viewport vp = GraphicsDevice.Viewport;
 
 			float vpWs = 2.0F / vp.Width;
 			float vpHs = -2.0F / vp.Height;
-
-			screenFill[0] = new ScreenQuadVert( rc.X, rc.Y, 0, 0 );
-			screenFill[1] = new ScreenQuadVert( rc.X + rc.Width, rc.Y, 1, 0 );
-			screenFill[2] = new ScreenQuadVert( rc.X, rc.Y + rc.Height, 0, 1 );
-			screenFill[3] = new ScreenQuadVert( rc.X + rc.Width, rc.Y + rc.Height, 1, 1 );
 
 			for( int i = 0; i < 4; i++ )
 			{
@@ -244,7 +271,8 @@ namespace hqNx
 			fx.Begin();
 
 			//extract the pattern bits
-			GenScreenQuad( new Rectangle( 0, 0, image.Width, image.Height ) );
+			GenScreenQuad( Vector2.Zero, image.Width, image.Height );
+			NormalizeQuadCoords();
 
 			patternPass.Begin();
 			GraphicsDevice.DrawUserPrimitives( PrimitiveType.TriangleStrip, screenFill, 0, 2 );
@@ -255,31 +283,55 @@ namespace hqNx
 			preparedImage = image;
 		}
 
-		public void Draw2x( Point origin )
+		public void Draw2x( Vector2 position )
 		{
 			if( preparedImage == null )
 				throw new InvalidOperationException();
 
-			MagnifyNx( origin, 2, hq2xPass );
+			MagnifyNx( position, Vector2.Zero, 0, 2, hq2xPass );
 		}
 
-		public void Draw3x( Point origin )
+		public void Draw2x( Vector2 position, float rotation, Vector2 origin )
 		{
 			if( preparedImage == null )
 				throw new InvalidOperationException();
 
-			MagnifyNx( origin, 3, hq3xPass );
+			MagnifyNx( position, origin, rotation, 2, hq2xPass );
 		}
 
-		public void Draw4x( Point origin )
+		public void Draw3x( Vector2 position )
 		{
 			if( preparedImage == null )
 				throw new InvalidOperationException();
 
-			MagnifyNx( origin, 4, hq4xPass );
+			MagnifyNx( position, Vector2.Zero, 0, 3, hq3xPass );
 		}
 
-		private void MagnifyNx( Point origin, int n, EffectPass scalePass )
+		public void Draw3x( Vector2 position, float rotation, Vector2 origin )
+		{
+			if( preparedImage == null )
+				throw new InvalidOperationException();
+
+			MagnifyNx( position, origin, rotation, 3, hq3xPass );
+		}
+
+		public void Draw4x( Vector2 position )
+		{
+			if( preparedImage == null )
+				throw new InvalidOperationException();
+
+			MagnifyNx( position, Vector2.Zero, 0, 4, hq4xPass );
+		}
+
+		public void Draw4x( Vector2 position, float rotation, Vector2 origin )
+		{
+			if( preparedImage == null )
+				throw new InvalidOperationException();
+
+			MagnifyNx( position, origin, rotation, 4, hq4xPass );
+		}
+
+		private void MagnifyNx( Vector2 position, Vector2 rotationOrigin, float rotation, int n, EffectPass scalePass )
 		{
 			GraphicsDevice.VertexDeclaration = screenQuadDecl;
 
@@ -289,8 +341,18 @@ namespace hqNx
 			GraphicsDevice.Textures[0] = preparedImage;
 			GraphicsDevice.Textures[1] = patternBuffer.GetTexture();
 
-			//scale!
-			GenScreenQuad( new Rectangle( origin.X, origin.Y, preparedImage.Width * n, preparedImage.Height * n ) );
+			if( rotation != 0 )
+			{
+				GenScreenQuad( Vector2.Zero, preparedImage.Width * n, preparedImage.Height * n );
+				RotateScreenQuad( rotationOrigin, rotation );
+				ShiftScreenQuad( position - rotationOrigin );
+				NormalizeQuadCoords();
+			}
+			else
+			{
+				GenScreenQuad( position - rotationOrigin, preparedImage.Width * n, preparedImage.Height * n );
+				NormalizeQuadCoords();
+			}
 
 			scalePass.Begin();
 			GraphicsDevice.DrawUserPrimitives( PrimitiveType.TriangleStrip, screenFill, 0, 2 );
